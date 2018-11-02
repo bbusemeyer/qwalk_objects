@@ -2,62 +2,24 @@ from __future__ import print_function
 import os
 ####################################################
 class LinearWriter:
-  def __init__(self,**options):
+  def __init__(self,sys,trialfunc,total_nstep=2048*4,total_fit=2048):
     ''' Object for producing input into a variance optimization QWalk run. 
     Args:
-      options (dict): editable options are as follows.
-        trialfunc (str): system and trial wavefunction section.
-        errtol (float): tolerance for the variance. 
-        minblocks (int): minimum number of VMC steps to take.
-        iterations (int): number of VMC steps to attempt.
-        macro_iterations (int): Number of optimize calls to make.
+      trialfunc (str): trial wavefunction section or object that can export_qwalk_trialfunc().
+      sys (str): system section or object that can export_qwalk_sys().
+      total_nstep (int): VMC steps to resolve Hamiltonian.
+      total_fit (int): Steps to use when computing step size.
     '''
-    self.sys=None
-    self.trialfunc=None
-    self.errtol=10
-    self.minblocks=0
-    self.total_nstep=2048*4 # 2048 gets stuck pretty often.
-    self.total_fit=2048
-    self.qmc_abr='energy'
-
-    self.qmc_type='Linear optimization'
-    self.qmc_abr='energy'
+    self.sys=sys
+    self.trialfunc=trialfunc
+    self.total_nstep = total_nstep
+    self.total_fit = total_fit
     self.completed=False
-    self.set_options(options)
 
-  #-----------------------------------------------
-  def set_options(self, d):
-    selfdict=self.__dict__
-    for k in d.keys():
-      if not k in selfdict.keys():
-        print("Error:",k,"not a keyword for LinearWriter")
-        raise InputError
-      selfdict[k]=d[k]
-
-  #-----------------------------------------------
-  def is_consistent(self,other):
-    #In principle we should check for the files, but 
-    #they are often determined *after* the plan has been 
-    #written so it's not currently practical to check them.
-    skipkeys = ['completed','sysfiles','wffiles','basenames']
-    for otherkey in other.__dict__.keys():
-      if otherkey not in self.__dict__.keys():
-        print('other is missing a key.')
-        return False
-    for selfkey in self.__dict__.keys():
-      if selfkey not in other.__dict__.keys():
-        print('self is missing a key.')
-        return False
-    for key in self.__dict__.keys():
-      if self.__dict__[key]!=other.__dict__[key] and key not in skipkeys:
-        print("Different keys [{}] = \n{}\n or \n {}"\
-            .format(key,self.__dict__[key],other.__dict__[key]))
-        return False
-    return True
-    
   #-----------------------------------------------
   def qwalk_input(self,infile):
-    assert self.trialfunc is not None
+    assert self.trialfunc is not None, "Must specify trialfunc before asking for qwalk_input."
+    assert self.sys is not None, "Must specify system before asking for qwalk_input."
 
     # Output all to strings.
     if type(self.sys) != str:
@@ -83,8 +45,7 @@ class LinearWriter:
 class LinearReader:
   def __init__(self,sigtol=2.0,minsteps=2):
     ''' Object for reading, diagnosing, and storing Linear results.
-
-    The arguements control when the object sends a 'restart' flag.
+    Args are only important for collect and check_complete.
 
     Args:
       sigtol (float): How many standard errors away from zero to you consider zero energy change?
@@ -98,6 +59,7 @@ class LinearReader:
     self.sigtol=sigtol
     self.minsteps=minsteps
 
+  #------------------------------------------------
   def read_outputfile(self,outfile):
     ret={}
     ret['energy_trace']=[]

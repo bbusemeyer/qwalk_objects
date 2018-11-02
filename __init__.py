@@ -1,6 +1,7 @@
 import autogen_tools
 import average_tools
 import crystal
+import crystal2qmc
 import dmc
 import linear
 import orbitals
@@ -15,6 +16,7 @@ __all__ = [
     'autogen_tools',
     'average_tools',
     'crystal',
+    'crystal2qmc',
     'dmc',
     'linear',
     'orbitals',

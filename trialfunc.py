@@ -20,6 +20,7 @@ class TrialFunc:
   def export_qwalk_wf(self,**kwargs):
     ''' This must be implmented. '''
     raise NotImplementedError('Trial function not completely implemented')
+  export_qwalk_trialfunc = export_qwalk_trialfunc
 
 #################################################################################################
 # Simple implementation for now. 
@@ -33,12 +34,12 @@ class Jastrow(TrialFunc):
     return self.jaststr
 
 #################################################################################################
-class Slater:
+class Slater(TrialFunc):
   ''' Class representing a slater determinant wave function. '''
-  def __init__(self,weights,states,orbfile,orbitals,shift_downorb=False):
+  def __init__(self,orbitals,orbfile,states,weights=(1.0,),shift_downorb=False):
     '''
     Args: 
-      weights (array-like): Weights of determinants for multideterminant expansion. First should be 1.0.
+      weights (array-like): Weights of determinants for multideterminant expansion. 
       states (array-like): states[determinant][spin channel][orbital] select orbitals for determinants.
         Indicies should reference whats written in the orbfile.
       orbfile (str): where orbitals are stored on disk (see write_qwalk_orb).
@@ -57,18 +58,17 @@ class Slater:
     Returns:
       str: wave function section.
     '''
-
     # Convert python indexing to QWalk indexing.
-    states=array(self.states)+1
-    states[:,1,:]+=self.shift_downorb
+    states = [[array(spinchannel) for spinchannel in det] for det in self.states]
     weights=array(self.weights)
 
     # Check input validity.
-    assert (len(states.shape)==3) and (states.shape[1]==2) and (states.shape[0]==weights.shape[0]),\
-        "States array should be nweights({}) by nspin(2) by nelectrons. One detweight per determinant. Its shape is {}".format(weights.shape[0],states.shape)
+    assert len(states[0])==2 and (len(states)==weights.shape[0]),\
+        "States array should be nweights({}) by nspin(2) by nelectrons. One detweight per determinant.".format(weights.shape[0])
 
-    upstatelines = [' '.join(det[0]) for det in states.astype(str)]
-    downstatelines = [' '.join(det[1]) for det in states.astype(str)]
+    for stdex in range(len(states)): states[stdex][1] += self.shift_downorb
+    upstatelines = [' '.join((det[0]+1).astype(str)) for det in states]
+    downstatelines = [' '.join((det[1]+1).astype(str)) for det in states]
 
     if optimize_det: optimize_det_lines=['optimize_det']
     else:            optimize_det_lines=[]
@@ -91,7 +91,7 @@ class Slater:
     return "\n".join(outlines)
 
 #################################################################################################
-class SlaterJastrow:
+class SlaterJastrow(TrialFunc):
   ''' Class rpresenting a slater determinant wave function. '''
   def __init__(self,slater,jastrow):
     '''

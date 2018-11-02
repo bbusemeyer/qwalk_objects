@@ -25,11 +25,13 @@ class System:
 
   # ----------------------------------------------------------------------------------------
   def __init__(self):
-    self.positions=[]
-    self.pseudo={}
-    #self.nspin=(1,1) # Not easy to extract. Is it really a property of structure?
-    self.group_number=1
-    self.latparm={}
+    self.positions = []
+    self.pseudo = {}
+    self.group_number = 1
+    self.latparm = {}
+    self.cutoff_divider = None
+    self.nspin = (0,0)
+    self.kpoint= (0.0,0.0,0.0)
 
   # ----------------------------------------------------------------------------------------
   def import_xyz(self):
@@ -157,21 +159,21 @@ class System:
     return geomlines
 
   # ----------------------------------------------------------------------------------------
-  def export_qwalk_sys(self,cutoff_divider,nspin,kpoint=(0.0,0.0,0.0)):
+  def export_qwalk_sys(self):
     ''' Generate a system section for QWalk.
-    Args:
-      cutoff divider (float): calculate using Basis object. 7.5 is a good default for finite systems.
-      kpoint (tuple): boundary condition.
     Returns: 
       list: List of the lines (str) making up the qwalk system section.
     '''
+    assert self.cutoff_divider is not None,"Must set cutoff_divider!"
+    assert self.nspin != (0,0),"Must set nspin!"
+
     outlines = []
 
     # Assumes 0-d or 3-d here.
     if self.latparm != {}:
       outlines += [
           "system { periodic",
-          "  nspin {{ {} {} }}".format(*nspin),
+          "  nspin {{ {} {} }}".format(*self.nspin),
           "  latticevec {",
         ]
       for i in range(3):
@@ -179,13 +181,13 @@ class System:
       outlines += [
           "  }",
           "  origin { 0 0 0 }",
-          "  cutoff_divider {0}".format(cutoff_divider),
-          "  kpoint {{ {:4}   {:4}   {:4} }}".format(*kpoint)
+          "  cutoff_divider {0}".format(self.cutoff_divider),
+          "  kpoint {{ {:4}   {:4}   {:4} }}".format(*self.kpoint)
         ]
     else: # is molecule.
       outlines += [
           "system { molecule",
-          "  nspin {{ {} {} }}".format(*nspin)
+          "  nspin {{ {} {} }}".format(*self.nspin)
         ]
     for position in self.positions:
       if position['species'] in self.pseudo:
@@ -317,6 +319,11 @@ class System:
       ]
 
     return Jastrow('\n'.join(outlines))
+
+  # ----------------------------------------------------------------------------------------
+  def find_cutoff_divider(self,min_exp):
+    self.cutoff_divider = find_cutoff_divider(self.latparm['latvecs'],min_exp)
+    return self.cutoff_divider
 
 ###########################################################################################
 def scrub_err(numstr):

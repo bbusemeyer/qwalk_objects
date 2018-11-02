@@ -18,6 +18,7 @@ import os
 
 class CrystalWriter: 
   def __init__(self,**options):
+    ''' There are lots of options, so just check the __init__ function for details.'''
     #Geometry input.
     self.struct=None
     self.struct_input=None # Manual structure input.
@@ -458,8 +459,6 @@ class CrystalWriter:
         r_to_n = non_local_component.find('./r_to_n').text
         strlist.append(' '.join([exp_gaus, coeff_gaus,r_to_n]))
     return strlist
-import os 
-
 
 ###################################################################
 
@@ -471,10 +470,49 @@ class CrystalReader:
     self.completed=False
     self.output={}
 
+  #-------------------------------------------------      
+  # This can be made more efficient if it's a problem: searches whole file for
+  # each query.
+  def check_outputfile(outfilename,acceptable_scf=10.0):
+    """ Check output file. 
+
+    Return values:
+    no_record, not_started, ok, too_many_cycles, finished (fall-back),
+    scf_fail, not_enough_decrease, divergence, not_finished
+    """
+    if os.path.isfile(outfilename):
+      outf = open(outfilename,'r',errors='ignore')
+    else:
+      return "not_started"
+
+    outlines = outf.readlines()
+    reslines = [line for line in outlines if "ENDED" in line]
+
+    if len(reslines) > 0:
+      if "CONVERGENCE" in reslines[0]:
+        return "ok"
+      elif "TOO MANY CYCLES" in reslines[0]:
+        return "too_many_cycles"
+      else: 
+        return "finished"
+      
+    detots = [float(line.split()[5]) for line in outlines if "DETOT" in line]
+    if len(detots) == 0:
+      return "scf_fail"
+
+    detots_net = sum(detots[1:])
+    if detots_net > acceptable_scf:
+      return "not_enough_decrease"
+
+    etots = [float(line.split()[3]) for line in outlines if "DETOT" in line]
+    if etots[-1] > 0:
+      return "divergence"
     
+    return "not_finished"
+
 #-------------------------------------------------      
   def collect(self,outfilename):
-    """ Collect results from output."""
+    """ Collect results from output, return if done."""
     # If the run didn't finish, then we won't find anything. 
     # In that case, we'll want to run again and collect again.
     status='killed'
@@ -518,60 +556,3 @@ class CrystalReader:
       # Just to be sure/clear...
       self.completed=False
     return status
-
-
-#-------------------------------------------------      
-  def write_summary(self):
-    print("Crystal total energy",self.output['total_energy'])
-
-
-#-------------------------------------------------      
-  # This can be made more efficient if it's a problem: searches whole file for
-  # each query.
-  def check_outputfile(outfilename,acceptable_scf=10.0):
-    """ Check output file. 
-
-    Return values:
-    no_record, not_started, ok, too_many_cycles, finished (fall-back),
-    scf_fail, not_enough_decrease, divergence, not_finished
-    """
-    if os.path.isfile(outfilename):
-      outf = open(outfilename,'r',errors='ignore')
-    else:
-      return "not_started"
-
-    outlines = outf.readlines()
-    reslines = [line for line in outlines if "ENDED" in line]
-
-    if len(reslines) > 0:
-      if "CONVERGENCE" in reslines[0]:
-        return "ok"
-      elif "TOO MANY CYCLES" in reslines[0]:
-        return "too_many_cycles"
-      else: 
-        return "finished"
-      
-    detots = [float(line.split()[5]) for line in outlines if "DETOT" in line]
-    if len(detots) == 0:
-      return "scf_fail"
-
-    detots_net = sum(detots[1:])
-    if detots_net > acceptable_scf:
-      return "not_enough_decrease"
-
-    etots = [float(line.split()[3]) for line in outlines if "DETOT" in line]
-    if etots[-1] > 0:
-      return "divergence"
-    
-    return "not_finished"
-  
-  
-#-------------------------------------------------      
-  def status(self,outfilename):
-    """ Decide status of crystal run. """
-
-    status=self.check_outputfile(outfilename)
-    return status
-    
-if __name__=='__main__':
-  print(space_group_format(136))

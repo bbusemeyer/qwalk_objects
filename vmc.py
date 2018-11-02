@@ -2,47 +2,38 @@ from __future__ import print_function
 import os
 import average_tools as avg
 from trialfunc import export_qwalk_trialfunc
+import subprocess as sub
+import json
 
 ####################################################
 class VMCWriter:
-  def __init__(self,
-        system,
-        trialfunc,
-        errtol=0.1,
-        minblocks=10,
-        nblock=100,
-        optimize_det=False,
-        averages=''
-      ):
+  def __init__(self,sys,trialfunc,nblock=100,averages=''):
     ''' Object for producing input into a VMC QWalk run. 
     Args:
-      options (dict): editable options are as follows.
-        system (System or str): system object or system section.
-        trialfunc (TrialFunc or str): TrialFunc object or trial wavefunction section.
-        errtol (float): tolerance for the estimated energy error. 
-        averages (str): averages section in qwalk.
-        optimize_det (bool): treat coefficients of slater determinant as parameters (for derivatives).
-        minblocks (int): minimum number of VMC steps to take, considering equillibration time.
+      trialfunc (str): trial wavefunction section or object that can export_qwalk_trialfunc().
+      sys (str): system section or object that can export_qwalk_sys().
+      nblock (int): Number of blocks to attempt.
+      averages (str): averages section in qwalk.
     '''
-    self.system=system
+    self.sys=sys
     self.trialfunc=trialfunc
-    self.errtol=errtol
-    self.minblocks=minblocks
     self.nblock=nblock
     self.averages=averages
-    self.optimize_det=optimize_det
 
-    self.qmc_abr='VMC'
     self.completed=False
 
   #-----------------------------------------------
   def qwalk_input(self,infile):
+    ''' Generate QWalk input file and write to infile.'''
+    assert self.trialfunc is not None, "Must specify trialfunc before asking for qwalk_input."
+    assert self.sys is not None, "Must specify system before asking for qwalk_input."
+
     if type(self.system) is not str:
       system=self.system.export_qwalk_sys()
     else:
       system=self.system
     if type(self.trialfunc) is not str:
-      trialfunc=export_qwalk_trialfunc(self.trialfunc,optimize_det=self.optimize_det)
+      trialfunc=export_qwalk_trialfunc(self.trialfunc)
     else:
       trialfunc=self.trialfunc
 
@@ -60,18 +51,20 @@ class VMCWriter:
 
     self.completed=True
 
-     
 ####################################################
-import subprocess as sub
-import json
 class VMCReader:
-  ''' Reads results from a VMC calculation. 
-
-  Attributes:
-    output (dict): results of calculation. 
-    completed (bool): whether the run has converged to a final answer.
-  '''
   def __init__(self,errtol=0.01,minblocks=15):
+    ''' Object for reading and storing variance optimizer results.
+    Args are only important for collect and check_complete.
+
+    Args:
+      vartol (float): Tolerance on the variance for collec.
+      vardifftol (float): Tolerance of the change between the first and last variance.
+      minsteps (int): minimun number of steps to attempt >= 2.
+    Attributes:
+      output (dict): Results for energy, error, and other information.
+      completed (bool): Whether no more runs are needed.
+    '''
     self.output={}
     self.completed=False
 

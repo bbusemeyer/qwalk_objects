@@ -3,72 +3,58 @@ import os
 import average_tools as avg
 ####################################################
 class DMCWriter:
-  def __init__(self,options={}):
-    ''' Object for producing input into a DMC QWalk run. 
+  def __init__(self,sys,trialfunc,timestep=0.01,nblock=100,tmoves=True,savetrace=True,averages=''):
+    ''' Object for producing input into a VMC QWalk run. 
     Args:
-      options (dict): editable options are as follows.
-        trialfunc (str): system and trial wavefunction section.
-        errtol (float): tolerance for the estimated energy error. 
-        timestep (float): time step for DMC.
-        tmoves (bool): Use Casula's t-moves.
-        savetrace (bool): Leave with a trace (file).
-        extra_observables (list): see `average_tools.py` for how to use this.
-        minblocks (int): minimum number of DMC steps to take, considering equillibration time.
-        iterations (int): number of DMC steps to attempt.
+      trialfunc (str): trial wavefunction section or object that can export_qwalk_trialfunc().
+      sys (str): system section or object that can export_qwalk_sys().
+      nblock (int): Number of blocks to attempt.
+      averages (str): averages section in qwalk.
     '''
-    self.trialfunc=''
-    self.errtol=0.1
-    self.minblocks=10 
-    self.nblock=30
-    self.timestep=0.01
-    self.tmoves=True
-    self.savetrace=True
-    self.extra_observables=[]
-
-    self.qmc_abr='dmc'
-    self.completed=False
-    self.set_options(options)
-
-  #-----------------------------------------------
-    
-  def set_options(self, d):
-    ''' Save setting of options.
-    Args: 
-      d (dict): attributes to update.
-    '''
-    selfdict=self.__dict__
-    for k in d.keys():
-      if not k in selfdict.keys():
-        raise ValueError("Error:",k,"not a keyword for DMCWriter")
-      selfdict[k]=d[k]
-
-    # Check completeness of average generator options.
-    for avg_generator in self.extra_observables:
-      avg.check_opts(avg_generator)
+    self.sys=sys
+    self.trialfunc=trialfunc
+    self.nblock=nblock
+    self.averages=averages
+    self.timestep=timestep
+    self.tmoves=tmoves
+    self.savetrace=savetrace
 
   #-----------------------------------------------
   def qwalk_input(self,infile):
-    if self.trialfunc=='':
-      print(self.__class__.__name__,": Trial function not ready. Postponing input file generation.")
-      self.completed=False
+    ''' Generate QWalk input file and write to infile.'''
+    assert self.trialfunc is not None, "Must specify trialfunc before asking for qwalk_input."
+    assert self.sys is not None, "Must specify system before asking for qwalk_input."
+
+    if type(self.system) is not str:
+      system=self.system.export_qwalk_sys()
     else:
-      outlines=[
-          "method { dmc timestep %g nblock %i"%(self.timestep,self.nblock)
-        ]
-      if self.tmoves:
-        outlines+=['tmoves']
-      if self.savetrace:
-        tracename = "%s.trace"%infile
-        outlines+=['save_trace %s'%tracename]
-      for avg_opts in self.extra_observables:
-        outlines+=avg.average_section(avg_opts)
-      outlines+=["}"]
-      outlines+=self.trialfunc.split('\n')
+      system=self.system
+    if type(self.trialfunc) is not str:
+      trialfunc=export_qwalk_trialfunc(self.trialfunc)
+    else:
+      trialfunc=self.trialfunc
 
-      with open(infile,'w') as f:
-        f.write('\n'.join(outlines))
+    outlines=[
+        "method { DMC",
+        "  nblock %i"%(self.nblock),
+        "  timestep %g"%self.timestep
+      ]
+    if self.tmoves:
+      outlines+=['  tmoves']
+    if self.savetrace:
+      tracename = "  %s.trace"%infile
+      outlines+=["  save_trace %s"%tracename]
+      
+    outlines+=['  '+line for line in self.averages.split('\n')]+[
+        "}"
+      ]
+    outlines.append(system)
+    outlines.append(trialfunc)
 
-      self.completed=True
+    with open(infile,'w') as f:
+      f.write('\n'.join(outlines))
+
+    self.completed=True
 
      
 ####################################################
