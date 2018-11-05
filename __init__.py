@@ -1,4 +1,3 @@
-import autogen_tools
 import average_tools
 import crystal
 import crystal2qmc
