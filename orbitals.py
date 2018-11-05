@@ -1,5 +1,5 @@
 from numpy import array
-from autogen_tools import normalize_eigvec
+from crystal2qmc import normalize_eigvec
 
 #################################################################################################
 class Orbitals:

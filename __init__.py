@@ -12,7 +12,6 @@ import variance
 import vmc
 
 __all__ = [
-    'autogen_tools',
     'average_tools',
     'crystal',
     'crystal2qmc',

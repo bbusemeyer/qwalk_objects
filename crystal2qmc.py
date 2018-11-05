@@ -8,7 +8,7 @@ import numpy as np
 import sys
 from system import System
 from orbitals import Orbitals
-from autogen_tools import normalize_eigvec
+from crystal2qmc import normalize_eigvec
 
 def error(message,errortype):
   print(message)
