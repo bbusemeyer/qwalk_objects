@@ -116,3 +116,42 @@ class SlaterJastrow(TrialFunc):
         '  }'
       ]
     return '\n'.join(outlines)
+
+######################################################################
+def separate_jastrow(wffile,optimizebasis=True,freezeall=False):
+  ''' Seperate the jastrow section of a QWalk wave function file.
+  Args:
+    optimizebasis (bool): whether to leave optimizebasis keyword in the section. 
+    freezeall (bool): whether to add freeze to all sections with parameters. 
+  Returns:
+    str: Jastrow section for qwalk.
+  '''
+  wff=open(wffile,'r')
+  tokens=wff.read().split('\n')
+  in_jastrow=False
+  nopen=0
+  nclose=0
+  jastlines=[]
+  for line in tokens:
+
+    if 'jastrow2' in line.lower() or 'jastrow3' in line.lower():
+      in_jastrow=True
+
+    if in_jastrow:
+
+      if not optimizebasis and 'optimizebasis' in line.lower():
+        line=' '.join([word for word in line.split() if word.lower() != 'optimizebasis'])
+        if line=='': continue
+
+      if 'BODY' in line and freezeall:
+        line=line+' FREEZE'
+
+      nopen+=line.count("{")
+      nclose+=line.count("}")
+
+      if nopen<nclose:
+        in_jastrow=False
+      else:
+        jastlines.append(line)
+
+  return '\n'.join(jastlines)

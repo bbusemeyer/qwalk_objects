@@ -899,6 +899,62 @@ def write_moanalysis():
   raise NotImplementedError()
   return None
 
+###############################################################################
+# f orbital normalizations are from 
+# <http://winter.group.shef.ac.uk/orbitron/AOs/4f/equations.html>
+def normalize_eigvec(eigvec,basis,atom_order):
+  ''' Changes crystal normalization to qwalk normalization.
+  eigvec will also be changed in place (i.e. does not copy).
+  Args:
+    eigvec (array): eigenvectors indexed by vector then AO.
+    basis (dict): basis information. 
+  Returns:
+    array: normalized view of eigvec.
+  '''
+  snorm = 1./(4.*np.pi)**0.5
+  pnorm = snorm*(3.)**.5
+  dnorms = [
+      .5*(5./(4*np.pi))**.5,
+      (15./(4*np.pi))**.5,
+      (15./(4*np.pi))**.5,
+      .5*(15./(4.*np.pi))**.5,
+      (15./(4*np.pi))**.5
+    ]
+  fnorms = [
+      ( 7./(16.*np.pi))**.5,
+      (21./(32.*np.pi))**.5,
+      (21./(32.*np.pi))**.5,
+      (105./(16.*np.pi))**.5, # xyz
+      (105./(4.*np.pi))**.5,
+      (35./(32.*np.pi))**.5,
+      (35./(32.*np.pi))**.5
+    ]
+
+  # Find order of angular momentum channels.
+  angular_order = []
+  for species in atom_order:
+    for element in basis[species]:
+      angular_order.append(element['angular'])
+
+  # This is to align properly with the d-components of eigvecs.
+  dnorms *= angular_order.count('5D')
+  fnorms *= angular_order.count('7F_crystal')
+
+  # Duplicate according to number of Lz states to get AO labels for eigvecs.
+  nangular = {'S':1,'P':3,'5D':5,'7F_crystal':7,'G':9,'H':11}
+  ao_type=[]
+  for btype in angular_order:
+    ao_type+=nangular[btype]*[btype]
+
+  ao_type=np.array(ao_type)
+
+  eigvec[:,ao_type=='S'] *= snorm
+  eigvec[:,ao_type=='P'] *= pnorm
+  eigvec[:,ao_type=='5D'] *= dnorms
+  eigvec[:,ao_type=='7F_crystal'] *= fnorms
+
+  return eigvec
+
 if __name__ == "__main__":
   from argparse import ArgumentParser
   parser=ArgumentParser('Convert a crystal file (defaults in brackets).')
