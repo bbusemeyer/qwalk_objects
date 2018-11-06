@@ -4,12 +4,12 @@
 import pandas as pd
 import numpy as np
 from functools import reduce
-import crystal2qmc
-from crystal2qmc import periodic_table,read_gred, read_kred, read_outputfile, eigvec_lookup
+from qwalk_objects.crystal2qmc import periodic_table,read_gred, read_kred, read_outputfile, eigvec_lookup
 import pyscf
 import pyscf.lo
 import pyscf.pbc
 import pyscf.pbc.dft
+import downfold_tools as dt
 from collections import Counter
 
 ##########################################################################################################
@@ -49,69 +49,11 @@ def crystal2pyscf_mol(propoutfn="prop.in.o",
   crydfs=format_eigenstates_mol(mol,cryeigsys,basis_order)
   nvals=len(cryeigsys['eigvals'])//nspin
   mf.mo_energy=[cryeigsys['eigvals'][:nvals],cryeigsys['eigvals'][nvals:]]
-  mf.mo_coeff=np.array([df[list(range(df.shape[0]))].values for df in crydfs])
+  mf.mo_coeff=np.array([df[[*range(df.shape[0])]].values for df in crydfs])
   mf.mo_occ=np.array([(cryeigsys['eig_weights'][0][s]>1e-8).astype(float) for s in [0,1]])
   mf.e_tot=np.nan #TODO compute energy and put it here, if needed.
 
   return mol,mf
-
-##########################################################################################################
-def format_eigenstates_mol(mol,cryeigsys,basis_order=None):
-  ''' Organize crystal eigenstates to be consistent with PySCF order.
-
-  Args: 
-    mol (Mole): Contains structure in PySCF object.
-    cryeigsys (dict): eigenstate info from cryeigsys.
-    basis_order (list): order that basis set is entered. 
-      None means it's sorted by angular momentum, like PySCF.
-      Example: for 's','p','d','s','s','p','p','d','d',
-        use [0,1,2,0,0,1,1,2,2,3].
-  Returns:
-    DataFrame: eigenstates in correct order, with labeling.
-  '''
-
-  # Extract.
-  crydfs=[pd.DataFrame(crystal2qmc.eigvec_lookup((0,0,0),cryeigsys,s).T) for s in [0,1]]
-
-  # PySCF basis order (our goal).
-  pydf=pd.DataFrame(mol.sph_labels(fmt=False),columns=['atnum','elem','orb','type'])
-
-  # Info about atoms.
-  crydfs=[df.join(pydf[['atnum','elem']]) for df in crydfs]
-
-  # Reorder basis.
-  def _apply_fix(df):
-    elem=df['elem'].values[0]
-    fixed_basis_order=fix_basis_order(basis_order[elem])
-    return df.reset_index(drop=True).loc[fixed_basis_order]
-  if basis_order is not None:
-    crydfs=[df.groupby(['atnum','elem']).apply(_apply_fix).reset_index(drop=True) for df in crydfs]
-
-  # Label by patching PySCF order.
-  crydfs=[df.join(pydf[['orb','type']]) for df in crydfs]
-  crystal_order=('', 'x', 'y', 'z', 'z^2', 'xz', 'yz',  'x2-y2', 'xy',   'z^3', 'xz^2', 'yz^2', 'zx^2', 'xyz',  'x^3',  'y^3')
-  pyscf_order=  ('', 'x', 'y', 'z', 'xy',  'yz', 'z^2', 'xz',   'x2-y2', 'y^3', 'xyz',  'yz^2', 'z^3',  'xz^2', 'zx^2', 'x^3')
-  orbmap=dict(zip(pyscf_order,crystal_order))
-  def convert_order(key):
-    try: return orbmap[key]
-    except KeyError: return None
-  for s in [0,1]:
-    crydfs[s]['type']=crydfs[s]['type'].apply(convert_order)
-
-  # Reorder crydf.
-  crydfs=[pydf.merge(df,on=['atnum','elem','orb','type']) for df in crydfs]
-
-  ## DEBUG check a vector
-  #ref_chkfile="../py_str/pyscf_driver.py.chkfile"
-  #check_mol=pyscf.lib.chkfile.load_mol(ref_chkfile)
-  #check_mf=pyscf.dft.UKS(check_mol)
-  #check_mf.__dict__.update(pyscf.pbc.lib.chkfile.load(ref_chkfile,'scf'))
-  #vector=0
-  ##print(pd.DataFrame({'energy':check_mf.mo_energy[0]}))
-  #crydfs[0]['check']=check_mf.mo_coeff[0][:,vector].real
-  #crydfs[0]['diff']=crydfs[0][vector]-crydfs[0]['check']
-  #print(crydfs[0][['atnum','elem','orb','type','check',vector,'diff']].round(4))
-  return crydfs
 
 ##########################################################################################################
 def crystal2pyscf_cell(
@@ -159,8 +101,11 @@ def crystal2pyscf_cell(
 
 
   # Copy over MO info.
-  crydfs=format_eigenstates_cell(cell,[eigvec_lookup((0,0,0),cryeigsys,s) for s in range(2)],basis_order)
-  mf.mo_coeff=np.array([[df[list(range(df.shape[0]))].values] for df in crydfs])
+  crydfs=format_eigenstates_cell(cell,cryeigsys,basis_order)
+  if len(crydfs)==1: # hack for restricted.
+    crydfs=[crydfs[0],crydfs[0]]
+  mf=pyscf.pbc.dft.KUKS(cell)
+  mf.mo_coeff=np.array([[df[[*range(df.shape[0])]].values] for df in crydfs])
   mf.mo_energy=cryeigsys['eigvals'].reshape(cryeigsys['eig_weights'].shape).swapaxes(0,1)
   mf.mo_occ=np.zeros((2,1,nmo))
   mf.mo_occ[0,0,0:nup]+=1
@@ -168,106 +113,6 @@ def crystal2pyscf_cell(
   mf.e_tot=np.nan #TODO compute energy and put it here, if needed.
 
   return cell,mf
-
-##########################################################################################################
-def objects2pyscf(
-    system,
-    orbitals,
-    nperspin,
-    basis,
-    basis_order=None,
-    mesh=None):
-  ''' Make a PySCF object with data from orbitals and system object. 
-
-  Args:
-    system (System): System object. See crystal2qmc.pack_objects.
-    orbitals (list): list of Orbitals. See crystal2qmc.pack_objects.
-    nperspin (tuple): number of electrons in each spin channel.
-    basis (dict or str): pyscf basis argument. 
-    basis_order (array-like): see fixed_basis_order.
-  Returns:
-    (Cell, SCF): Cell and SCF object containing the data from the objects.
-  '''
-  #TODO Make basis from crystal output (fix normalization issue).
-  #  It should be possible to get the basis from the internals of orbitals, but
-  #  the normalization is off so it doesn't work yet. 
-  #  Should be able to get the normalization by combining crystal2qwalk and pyscf2qwalk.
-  #TODO Generalize spin and kpoint.
-
-  # Format and input structure.
-  atom=[ (pos['species'],pos['xyz']) for pos in system.positions ]
-
-  cell=pyscf.pbc.gto.Cell()
-  cell.build(atom=atom,a=system.latparm['latvecs'],unit='bohr',
-      mesh=mesh,basis=basis,ecp='bfd',verbose=1)
-      #mesh=mesh,basis=orbitals[0].export_pyscf_basis(),ecp='bfd',verbose=1)  # no no: see TODO about normalization
-
-  # Get kpoints that PySCF expects.
-  # TODO only Gamma for now.
-  kpts=cell.make_kpts((1,1,1))
-  kpts=cell.get_scaled_kpts(kpts)
-
-  mf=pyscf.pbc.dft.KUKS(cell)
-
-  # Copy over MO info.
-  crydfs=format_eigenstates_cell(cell,orbitals[0].eigvecs,basis_order)
-  mf.mo_coeff=np.array([[df[list(range(df.shape[0]))].values] for df in crydfs])
-  #mf.mo_energy=orbitals[0].eigvals.swapaxes(0,1)
-  mf.mo_occ=np.zeros((2,1,orbitals[0].eigvecs[0].shape[0]))
-  mf.mo_occ[0,0,0:nperspin[0]]+=1
-  mf.mo_occ[1,0,0:nperspin[0]]+=1
-  mf.e_tot=np.nan #TODO compute energy and put it here, if needed.
-
-  return cell,mf
-
-##########################################################################################################
-def format_eigenstates_cell(cell,eigvecs,basis_order=None):
-  ''' Organize crystal eigenstates to be consistent with PySCF order.
-
-  Args: 
-    cell (Cell): Contains structure in PySCF object.
-    eigvecs (array-like): eigenvectors index by kpt,spin,eigvec,component.
-    basis_order (list): order that basis set is entered. 
-      None means it's sorted by angular momentum, like PySCF.
-      Example: for 's','p','d','s','s','p','p','d','d',
-        use [0,1,2,0,0,1,1,2,2,3].
-  Returns:
-    DataFrame: eigenstates in correct order, with labeling.
-  '''
-
-  # Extract.
-  # TODO non-Gamma points.
-  crydfs=[pd.DataFrame(eigvecs[s].T) for s in [0,1]]
-
-  # PySCF basis order (our goal).
-  pydf=pd.DataFrame(cell.sph_labels(fmt=False),columns=['atnum','elem','orb','type'])
-
-  # Info about atoms.
-  crydfs=[df.join(pydf[['atnum','elem']]) for df in crydfs]
-
-  # Reorder basis.
-  def _apply_fix(df):
-    elem=df['elem'].values[0]
-    fixed_basis_order=fix_basis_order(basis_order[elem])
-    return df.reset_index(drop=True).loc[fixed_basis_order]
-  if basis_order is not None:
-    crydfs=[df.groupby(['atnum','elem']).apply(_apply_fix).reset_index(drop=True) for df in crydfs]
-
-  # Label by patching PySCF order.
-  crydfs=[df.join(pydf[['orb','type']]) for df in crydfs]
-  crystal_order=('', 'x', 'y', 'z', 'z^2', 'xz', 'yz',  'x2-y2', 'xy',   'z^3', 'xz^2', 'yz^2', 'zx^2', 'xyz',  'x^3',  'y^3')
-  pyscf_order=  ('', 'x', 'y', 'z', 'xy',  'yz', 'z^2', 'xz',   'x2-y2', 'y^3', 'xyz',  'yz^2', 'z^3',  'xz^2', 'zx^2', 'x^3')
-  orbmap=dict(zip(pyscf_order,crystal_order))
-  def convert_order(key):
-    try: return orbmap[key]
-    except KeyError: return None
-  for s in range(cryeigsys['nspin']):
-    crydfs[s]['type']=crydfs[s]['type'].apply(convert_order)
-
-  # Reorder crydf.
-  crydfs=[pydf.merge(df,on=['atnum','elem','orb','type']) for df in crydfs]
-
-  return crydfs
 
 ##########################################################################################################
 def fix_basis_order(basis_order):
@@ -303,6 +148,113 @@ def fix_basis_order(basis_order):
     start+=counts[l]
 
   return amsorted
+
+##########################################################################################################
+def format_eigenstates_mol(mol,cryeigsys,basis_order=None):
+  ''' Organize crystal eigenstates to be consistent with PySCF order.
+
+  Args: 
+    mol (Mole): Contains structure in PySCF object.
+    cryeigsys (dict): eigenstate info from cryeigsys.
+    basis_order (list): order that basis set is entered. 
+      None means it's sorted by angular momentum, like PySCF.
+      Example: for 's','p','d','s','s','p','p','d','d',
+        use [0,1,2,0,0,1,1,2,2,3].
+  Returns:
+    DataFrame: eigenstates in correct order, with labeling.
+  '''
+
+  # Extract.
+  crydfs=[pd.DataFrame(eigvec_lookup((0,0,0),cryeigsys,s).T) for s in [0,1]]
+
+  # PySCF basis order (our goal).
+  pydf=pd.DataFrame(mol.sph_labels(fmt=False),columns=['atnum','elem','orb','type'])
+
+  # Info about atoms.
+  crydfs=[df.join(pydf[['atnum','elem']]) for df in crydfs]
+
+  # Reorder basis.
+  def _apply_fix(df):
+    elem=df['elem'].values[0]
+    fixed_basis_order=fix_basis_order(basis_order[elem])
+    return df.reset_index(drop=True).loc[fixed_basis_order]
+  if basis_order is not None:
+    crydfs=[df.groupby(['atnum','elem']).apply(_apply_fix).reset_index(drop=True) for df in crydfs]
+
+  # Label by patching PySCF order.
+  crydfs=[df.join(pydf[['orb','type']]) for df in crydfs]
+  crystal_order=('', 'x', 'y', 'z', 'z^2', 'xz', 'yz',  'x2-y2', 'xy',   'z^3', 'xz^2', 'yz^2', 'zx^2', 'xyz',  'x^3',  'y^3')
+  pyscf_order=  ('', 'x', 'y', 'z', 'xy',  'yz', 'z^2', 'xz',   'x2-y2', 'y^3', 'xyz',  'yz^2', 'z^3',  'xz^2', 'zx^2', 'x^3')
+  orbmap=dict(zip(pyscf_order,crystal_order))
+  def convert_order(key):
+    try: return orbmap[key]
+    except KeyError: return None
+  for s in [0,1]:
+    crydfs[s]['type']=crydfs[s]['type'].apply(convert_order)
+
+  # Reorder crydf.
+  crydfs=[pydf.merge(df,on=['atnum','elem','orb','type']) for df in crydfs]
+
+  ## DEBUG check a vector
+  #ref_chkfile="../py_str/pyscf_driver.py.chkfile"
+  #check_mol=pyscf.lib.chkfile.load_mol(ref_chkfile)
+  #check_mf=pyscf.dft.UKS(check_mol)
+  #check_mf.__dict__.update(pyscf.pbc.lib.chkfile.load(ref_chkfile,'scf'))
+  #vector=0
+  ##print(pd.DataFrame({'energy':check_mf.mo_energy[0]}))
+  #crydfs[0]['check']=check_mf.mo_coeff[0][:,vector].real
+  #crydfs[0]['diff']=crydfs[0][vector]-crydfs[0]['check']
+  #print(crydfs[0][['atnum','elem','orb','type','check',vector,'diff']].round(4))
+  return crydfs
+
+##########################################################################################################
+def format_eigenstates_cell(cell,cryeigsys,basis_order=None):
+  ''' Organize crystal eigenstates to be consistent with PySCF order.
+
+  Args: 
+    cell (Cell): Contains structure in PySCF object.
+    cryeigsys (dict): eigenstate info from cryeigsys.
+    basis_order (list): order that basis set is entered. 
+      None means it's sorted by angular momentum, like PySCF.
+      Example: for 's','p','d','s','s','p','p','d','d',
+        use [0,1,2,0,0,1,1,2,2,3].
+  Returns:
+    DataFrame: eigenstates in correct order, with labeling.
+  '''
+
+  # Extract.
+  # TODO non-Gamma points.
+  crydfs=[pd.DataFrame(eigvec_lookup((0,0,0),cryeigsys,s).T) for s in range(cryeigsys['nspin'])]
+
+  # PySCF basis order (our goal).
+  pydf=pd.DataFrame(cell.sph_labels(fmt=False),columns=['atnum','elem','orb','type'])
+
+  # Info about atoms.
+  crydfs=[df.join(pydf[['atnum','elem']]) for df in crydfs]
+
+  # Reorder basis.
+  def _apply_fix(df):
+    elem=df['elem'].values[0]
+    fixed_basis_order=fix_basis_order(basis_order[elem])
+    return df.reset_index(drop=True).loc[fixed_basis_order]
+  if basis_order is not None:
+    crydfs=[df.groupby(['atnum','elem']).apply(_apply_fix).reset_index(drop=True) for df in crydfs]
+
+  # Label by patching PySCF order.
+  crydfs=[df.join(pydf[['orb','type']]) for df in crydfs]
+  crystal_order=('', 'x', 'y', 'z', 'z^2', 'xz', 'yz',  'x2-y2', 'xy',   'z^3', 'xz^2', 'yz^2', 'zx^2', 'xyz',  'x^3',  'y^3')
+  pyscf_order=  ('', 'x', 'y', 'z', 'xy',  'yz', 'z^2', 'xz',   'x2-y2', 'y^3', 'xyz',  'yz^2', 'z^3',  'xz^2', 'zx^2', 'x^3')
+  orbmap=dict(zip(pyscf_order,crystal_order))
+  def convert_order(key):
+    try: return orbmap[key]
+    except KeyError: return None
+  for s in range(cryeigsys['nspin']):
+    crydfs[s]['type']=crydfs[s]['type'].apply(convert_order)
+
+  # Reorder crydf.
+  crydfs=[pydf.merge(df,on=['atnum','elem','orb','type']) for df in crydfs]
+
+  return crydfs
 
 ##########################################################################################################
 def make_basis(crybasis,ions,base="qwalk"):
