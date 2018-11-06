@@ -253,7 +253,8 @@ class System:
     Returns:
       Jastrow: Jastrow object.
     '''
-    from trialfunc import Jastrow 
+    import qwalk_objects
+    from qwalk_objects.trialfunc import Jastrow 
 
     if threebody: raise NotImplementedError("Should be simple to add three-body, but haven't bothered yet.")
       

@@ -101,7 +101,7 @@ def convert_crystal(
   return files
 
 ###############################################################################
-def pack_objects(gred="GRED.DAT",kred="KRED.DAT",maxbands=(None,None)):
+def pack_objects(gred="GRED.DAT",kred="KRED.DAT",spin=0,maxbands=(None,None),realonly=True):
   ''' Create System and Orbitals objects from Crystal results. 
   These objects can generate QWalk input files.
 
@@ -110,11 +110,12 @@ def pack_objects(gred="GRED.DAT",kred="KRED.DAT",maxbands=(None,None)):
     kred (str): path to KRED.DAT.
     maxbands (tuple): limit on number of orbitals to read in per spin channel.
       defaults to all availabe orbitals == size of basis set.
+    realonly (bool): do only the 8 real kpoints.
   Returns:
     sys (System): System object.
     orbs (Orbitals): Orbitals object.
   '''
-  # This is the pretty-much raw data from the Crystal output files.
+  # This is the pretty much raw data from the Crystal output files.
   info, lat_parm, ions, basis, pseudo = read_gred(gred)
   eigsys = read_kred(info,basis,kred)
 
@@ -124,11 +125,20 @@ def pack_objects(gred="GRED.DAT",kred="KRED.DAT",maxbands=(None,None)):
   sys.pseudo=format_pseudo(pseudo,ions)
   sys.positions=format_positions(ions)
 
+  totcharge = int(round(sum(basis['charges'])))
+  assert totcharge%2 == spin%2, 'Spin and charge are incompatible.'
+  sys.nspin = ( (totcharge + spin)//2 , (totcharge - spin)//2 )
+
+  basis  =  format_basis(ions,basis)
+  sys.find_cutoff_divider(obj.orbitals.find_min_exp(basis))
+
+
   allorbs=[]
 
   for kidx,kpt in enumerate(eigsys['kpt_coords']):
+    if eigsys['ikpt_iscmpx'][kpt] and realonly: continue
     orbs=obj.orbitals.Orbitals()
-    orbs.basis=format_basis(ions,basis)
+    orbs.basis=basis
     orbs.kpoint=(np.array(kpt)/eigsys['nkpts_dir']*2.)
     orbs.eigvecs=[eigvec_lookup(kpt,eigsys,s,maxbands=maxbands[s]) for s in range(eigsys['nspin'])]
     orbs.eigvals=eigsys['eigvals'][kidx]
