@@ -1,4 +1,5 @@
 from __future__ import print_function
+from qwalk_objects.trialfunc import export_qwalk_trialfunc
 import os
 ####################################################
 class DMCWriter:
@@ -17,6 +18,7 @@ class DMCWriter:
     self.timestep=timestep
     self.tmoves=tmoves
     self.savetrace=savetrace
+    self.completed=False
 
   #-----------------------------------------------
   def qwalk_input(self,infile):
@@ -24,10 +26,10 @@ class DMCWriter:
     assert self.trialfunc is not None, "Must specify trialfunc before asking for qwalk_input."
     assert self.sys is not None, "Must specify system before asking for qwalk_input."
 
-    if type(self.system) is not str:
-      system=self.system.export_qwalk_sys()
+    if type(self.sys) is not str:
+      system=self.sys.export_qwalk_sys()
     else:
-      system=self.system
+      system=self.sys
     if type(self.trialfunc) is not str:
       trialfunc=export_qwalk_trialfunc(self.trialfunc)
     else:

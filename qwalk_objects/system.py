@@ -248,7 +248,7 @@ class System:
     return '\n'.join(outlines)+'\n'
 
   # ----------------------------------------------------------------------------------------
-  def export_jast(self,threebody=False):
+  def export_jastrow(self,threebody=False):
     ''' Makes a unoptimized Jastrow wave function section which should be optimizized before using in QMC.
     Returns:
       Jastrow: Jastrow object.
