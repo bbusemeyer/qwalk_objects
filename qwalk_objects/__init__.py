@@ -1,3 +1,4 @@
+from qwalk_objects import pyscf2qwalk
 from qwalk_objects import average_tools
 from qwalk_objects import crystal
 from qwalk_objects import crystal2qmc
