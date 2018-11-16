@@ -529,7 +529,7 @@ def eigvec_lookup(kpt,eigsys,spin=0,maxbands=None):
     if li==linesperkpt: break
     eigvec+=line.split()
 
-  eigvec = np.array(eigvec,dtype=float)
+  eigvec = np.array(eigvec[:ncpnts],dtype=float)
 
   if eigsys['ikpt_iscmpx'][kpt]:
     eigvec=eigvec.reshape(ncpnts//2,2)

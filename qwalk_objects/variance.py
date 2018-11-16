@@ -41,13 +41,13 @@ class VarianceWriter:
      
 ####################################################
 class VarianceReader:
-  def __init__(self,vartol=10,vardifftol=0.1,minsteps=2):
+  def __init__(self,vartol=10,vardifftol=0.01,minsteps=2):
     ''' Object for reading and storing variance optimizer results.
     Args are only important for collect and check_complete.
 
     Args:
       vartol (float): Tolerance on the variance for collec.
-      vardifftol (float): Tolerance of the change between the first and last variance.
+      vardifftol (float): Fractional change in variance allowed from inital configuration.
       minsteps (int): minimun number of steps to attempt >= 2.
     Attributes:
       output (dict): Results for energy, error, and other information.
@@ -105,15 +105,15 @@ class VarianceReader:
       bool: If self.output are within error tolerances.
     '''
     if len(self.output['sigma_trace']) < self.minsteps:
-      print(self.__class__.__name__,": Variance optimize incomplete: number of steps (%f) less than minimum (%f)"%\
+      print(self.__class__.__name__,": Variance optimize incomplete: number of steps (%g) less than minimum (%g)"%\
           (len(self.output['sigma_trace']),self.minsteps))
       return False
     if self.output['sigma'] > self.vartol:
       print(self.__class__.__name__,": Variance optimize incomplete: variance ({}) does not meet tolerance ({})"\
           .format(self.output['sigma'],self.vartol))
       return False
-    if (self.output['sigma_trace'][-1]-self.output['sigma_trace'][-2]) > self.vardifftol:
-      print(self.__class__.__name__,": Variance optimize incomplete: change in variance (%f) less than tolerance (%f)"%\
-          (self.output['sigma_trace'],self.vardifftol))
+    if (self.output['sigma_trace'][-2]-self.output['sigma_trace'][-1]) > self.vardifftol*self.output['sigma_trace'][-1]:
+      print(self.__class__.__name__,": Variance optimize incomplete: change in variance ({}) less than tolerance ({})"\
+          .format(self.output['sigma_trace'][-2:],self.vardifftol*self.output['sigma_trace'][-1]))
       return False
     return True
