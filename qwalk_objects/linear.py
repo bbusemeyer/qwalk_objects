@@ -27,7 +27,7 @@ class LinearWriter:
     else:
       sys=self.sys
     if type(self.trialfunc) != str:
-      trialfunc=self.trialfunc.export_trialfunc()
+      trialfunc=self.trialfunc.export_qwalk_trialfunc()
     else:
       trialfunc=self.trialfunc
 
