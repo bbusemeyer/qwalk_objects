@@ -143,7 +143,7 @@ def separate_jastrow(wffile,optimizebasis=True,freezeall=False):
         line=' '.join([word for word in line.split() if word.lower() != 'optimizebasis'])
         if line=='': continue
 
-      if 'BODY' in line and freezeall:
+      if 'body' in line.lower() and freezeall:
         line=line+' FREEZE'
 
       nopen+=line.count("{")
