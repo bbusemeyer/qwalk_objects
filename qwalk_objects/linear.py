@@ -2,7 +2,7 @@ from __future__ import print_function
 import os
 ####################################################
 class LinearWriter:
-  def __init__(self,sys,trialfunc,total_nstep=2048*4,total_fit=2048):
+  def __init__(self,sys,trialfunc,total_nstep=2048*8,total_fit=2048):
     ''' Object for producing input into a variance optimization QWalk run. 
     Args:
       trialfunc (str): trial wavefunction section or object that can export_qwalk_trialfunc().

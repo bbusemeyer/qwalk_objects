@@ -56,7 +56,6 @@ class DMCWriter:
       f.write('\n'.join(outlines))
 
     self.completed=True
-
      
 ####################################################
 import subprocess as sub

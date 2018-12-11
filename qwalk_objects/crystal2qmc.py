@@ -142,7 +142,7 @@ def pack_objects(gred="GRED.DAT",kred="KRED.DAT",spin=0,maxbands=(None,None),rea
     orbs.kpoint=(np.array(kpt)/eigsys['nkpts_dir']*2.)
     orbs.eigvecs=[eigvec_lookup(kpt,eigsys,s,maxbands=maxbands[s]) for s in range(eigsys['nspin'])]
     orbs.eigvals=eigsys['eigvals'][kidx]
-    orbs.kweight=eigsys['eig_weights'][kidx]
+    orbs.kweight=eigsys['kpt_weights'][kidx]
     orbs.atom_order=[periodic_table[n%200-1] for n in ions['atom_nums']]
     allorbs.append(orbs)
 
