@@ -81,7 +81,11 @@ class DMCReader:
     Args:
       outfile (str): output to read.
     '''
-    return json.loads(sub.check_output([self.gosling,"-json",outfile.replace('.o','.log')]).decode())
+    try: 
+      res = json.loads(sub.check_output([self.gosling,"-json",outfile.replace('.o','.log')]).decode())
+    except json.decoder.JSONDecodeError:
+      res = {}
+    return res
 
   def check_complete(self):
     ''' Check if a DMC run is complete.
@@ -89,7 +93,7 @@ class DMCReader:
       bool: If self.results are within error tolerances.
     '''
     completed=True
-    if len(self.output)==0:
+    if 'properties' not in self.output:
       return False # No results yet.
     if self.output['properties']['total_energy']['error'][0] > self.errtol:
       print("DMC incomplete: (%f) does not meet tolerance (%f)"%\
