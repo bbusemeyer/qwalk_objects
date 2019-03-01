@@ -117,8 +117,8 @@ class Orbitals:
       "{0}orbitals {{".format(('','c')[iscomplex]),
       "  magnify 1",
       "  nmo {0}".format(sum([e.shape[0] for e in self.eigvecs])),
-      "  orbfile {0}".format(orbfn),
-      self.export_qwalk_basis(),
+      "  orbfile {0}".format(orbfn)
+      ] + ["  "+line for line in self.export_qwalk_basis().split('\n')] + [
       "  centers { useglobal }",
       "}"
     ]
