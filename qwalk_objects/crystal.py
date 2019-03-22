@@ -269,9 +269,12 @@ class CrystalWriter:
   #-----------------------------------------------
   def properties_input(self):
     outlines=['NEWK']
-    if self.boundary=='3d':
+    if self.boundary=='3d' or self.boundary=='2d':
       outlines+=[ "0 %i"%self.gmesh,
                   " ".join(map(str,self.kmesh))]
+    elif self.boundary=='1d'
+      assert len(self.kmesh)==1
+      outlines+=[ "%i %i"%(self.kmesh[0],self.gmesh)]
     outlines+=["1 0"]
     if self.cryapi:
       outlines+=["CRYAPI_OUT"]
