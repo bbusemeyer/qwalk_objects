@@ -185,6 +185,9 @@ class CrystalWriter:
     if self.boundary=="3d": # Can also include 2d later.
       outlines+= ["SHRINK","0 %i"%self.gmesh]
       outlines+= [" ".join(map(str,self.kmesh))]
+    elif self.boundary=="1d":
+      assert len(self.kmesh)==1
+      outlines += ["SHRINK","%i %i"%(self.kmesh[0],self.gmesh)]
 
     outlines+=["DFT"]
     if self.spin_polarized:
@@ -204,7 +207,6 @@ class CrystalWriter:
       outlines+=[self.dftgrid]
     outlines+=["END",
       "SCFDIR",
-      "SAVEPRED",
       "BIPOSIZE",
       str(self.biposize),
       "EXCHSIZE",
@@ -217,6 +219,8 @@ class CrystalWriter:
       str(self.maxcycle),
       "SAVEWF"
     ]
+    if self.boundary=='3d':
+      outlines+=["SAVEPRED"]
     if self.smear > 0:
       outlines+=["SMEAR",str(self.smear)]
     if self.spin_polarized:
@@ -306,9 +310,19 @@ class CrystalWriter:
     """Generate the geometry section for CRYSTAL"""
     if self.struct_input is not None:
       # TODO make into function like geom3d?
-      geomlines=[
-          'CRYSTAL',
-          '0 0 0',
+      if self.struct_input['type'].lower()=='crystal':
+        self.boundary = '3d'
+      elif self.struct_input['type'].lower()=='slab':
+        self.boundary = '2d'
+      elif self.struct_input['type'].lower()=='polymer':
+        self.boundary = '1d'
+      elif self.struct_input['type'].lower()=='molecule':
+        self.boundary = '0d'
+      else:
+        raise AssertionError("Invalid structure type.")
+      geomlines=[self.struct_input['type']]
+      if self.boundary=='3d': geomlines+=['0 0 0']
+      geomlines+=[
           str(self.struct_input['symmetry']),
           ' '.join(map(str,self.struct_input['parameters'])),
           str(len(self.struct_input['coords']))
