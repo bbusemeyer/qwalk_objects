@@ -65,7 +65,7 @@ class CrystalWriter:
     self.diis_opts = [] # lines for DIIS.
     self.broyden=[]
     self.anderson=False
-    self.smear=0.0001
+    self.smear=0.0
 
     # Use the new crystal2qmc script. This should change soon!
     self.cryapi=True
