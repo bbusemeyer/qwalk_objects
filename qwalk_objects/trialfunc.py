@@ -53,13 +53,24 @@ class Slater(TrialFunc):
     self.orbitals=orbitals
     self.shift_downorb=shift_downorb*(orbitals.eigvecs[0].shape[0])
 
-  def export_qwalk_wf(self,optimize_det=False):
+  def export_qwalk_wf(self,optimize_det=False,rotate_orbs=None):
     ''' Write out a qwalk wave function section .
+    Args:
+      orbitals (Orbitals): object contraining orbitals. 
+      orbfile (str): path to where orbitals are writting to disk.
+      states (list): nested list of dimension 3. Indices are states[determinant][spin][orbital]. 
+        Use 0-based indexing, as this will be converted to 1-based indexing in the export.
+      optimize_det (bool): Add optimize_det flag to optimize determinant coefficients.
+      rotate_orbs (list): Adds 'optimize_data' flag if not None.
+        list of lists of orb groups to rotate between. For example, [[1,2,3],[4,5,6]]
     Returns:
       str: wave function section.
     '''
     # Convert python indexing to QWalk indexing.
     states = [[array(spinchannel) for spinchannel in det] for det in self.states]
+    for det in states:
+      for spinchan in det:
+        assert (spinchan!=0).all(),"Are you using 0-based indexing? QWalk uses 1-based index!"
     weights=array(self.weights)
 
     # Check input validity.
@@ -67,15 +78,27 @@ class Slater(TrialFunc):
         "States array should be nweights({}) by nspin(2) by nelectrons. One detweight per determinant.".format(weights.shape[0])
 
     for stdex in range(len(states)): states[stdex][1] += self.shift_downorb
-    upstatelines = [' '.join((det[0]+1).astype(str)) for det in states]
-    downstatelines = [' '.join((det[1]+1).astype(str)) for det in states]
+    upstatelines = [' '.join((det[0]).astype(str)) for det in states]
+    downstatelines = [' '.join((det[1]).astype(str)) for det in states]
 
+    # Det. coefficients.
     if optimize_det: optimize_det_lines=['optimize_det']
     else:            optimize_det_lines=[]
 
+    # Orbital rotations.
+    if rotate_orbs is not None: 
+      optimize_mo_lines=['optimize_mo','optimize_data { ','  det { ']
+      for group in rotate_orbs:
+        optimize_mo_lines += [
+            '    orb_group { ',
+            '      ' + ' '.join(map(str,group)),
+            '    }'
+          ]
+      optimize_mo_lines += ['  }','}']
+    else: optimize_mo_lines=[]
+
     outlines = [
         "slater",
-      ]+optimize_det_lines+[
         self.orbitals.export_qwalk_orbitals(self.orbfn),
         "detwt {{ {} }}".format(' '.join(weights.astype(str))),
         "states {"
@@ -88,6 +111,8 @@ class Slater(TrialFunc):
           "  " + downline
         ]
     outlines+=['}']
+    outlines += optimize_det_lines
+    outlines += optimize_mo_lines
     return "\n".join(outlines)
 
 #################################################################################################
