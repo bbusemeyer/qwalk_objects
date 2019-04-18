@@ -2,10 +2,11 @@ from __future__ import print_function
 import os
 ####################################################
 class LinearWriter:
-  def __init__(self,sys,trialfunc,total_nstep=2048*8,total_fit=2048):
+  def __init__(self,sys,trialfunc,trialfunc_options=None,total_nstep=2048*8,total_fit=2048):
     ''' Object for producing input into a variance optimization QWalk run. 
     Args:
       trialfunc (str): trial wavefunction section or object that can export_qwalk_trialfunc().
+      trialfunc_options (dict): Options to pass to trialfuncion.
       sys (str): system section or object that can export_qwalk_sys().
       total_nstep (int): VMC steps to resolve Hamiltonian.
       total_fit (int): Steps to use when computing step size.
@@ -16,10 +17,11 @@ class LinearWriter:
     self.total_fit = total_fit
     self.completed=False
 
+    if trialfunc_options is not None: self.trialfunc_options = trialfunc_options
+    else:                             self.trialfunc_options = {}
+
   #-----------------------------------------------
   def qwalk_input(self,infile):
-    assert self.trialfunc is not None, "Must specify trialfunc before asking for qwalk_input."
-    assert self.sys is not None, "Must specify system before asking for qwalk_input."
 
     # Output all to strings.
     if type(self.sys) != str:
@@ -27,7 +29,7 @@ class LinearWriter:
     else:
       sys=self.sys
     if type(self.trialfunc) != str:
-      trialfunc=self.trialfunc.export_qwalk_trialfunc()
+      trialfunc=self.trialfunc.export_qwalk_trialfunc(**self.trialfunc_options)
     else:
       trialfunc=self.trialfunc
 

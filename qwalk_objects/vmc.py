@@ -52,7 +52,7 @@ class VMCWriter:
 
 ####################################################
 class VMCReader:
-  def __init__(self,errtol=0.01,minblocks=15):
+  def __init__(self,errtol=0.01,minblocks=15,gosling="gosling"):
     ''' Object for reading and storing variance optimizer results.
     Args are only important for collect and check_complete.
 
@@ -69,7 +69,7 @@ class VMCReader:
 
     self.errtol=errtol
     self.minblocks=minblocks
-    self.gosling="gosling"
+    self.gosling=gosling
 
   def read_outputfile(self,outfile):
     ''' Read output file results.
