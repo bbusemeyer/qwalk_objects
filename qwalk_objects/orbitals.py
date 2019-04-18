@@ -98,7 +98,7 @@ class Orbitals:
       for element in self.basis[species]:
         numprim=element['coefs'].shape[0]
         outlines+=['    %s %d'%(element['angular'],numprim)]
-        outlines+=['    %d %.16f %.16f'%(idx,exp,coef)
+        outlines+=['    %d %.16f %.16f'%(idx+1,exp,coef)
             for idx,exp,coef in zip(range(numprim),element['exponents'],element['coefs'])
           ]
       outlines+=['  }','}']
