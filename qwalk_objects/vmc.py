@@ -6,7 +6,7 @@ import json
 
 ####################################################
 class VMCWriter:
-  def __init__(self,sys,trialfunc,nblock=100,averages=''):
+  def __init__(self,sys,trialfunc,nblock=100,nstep=100,averages=''):
     ''' Object for producing input into a VMC QWalk run. 
     Args:
       trialfunc (str): trial wavefunction section or object that can export_qwalk_trialfunc().
@@ -17,6 +17,7 @@ class VMCWriter:
     self.sys=sys
     self.trialfunc=trialfunc
     self.nblock=nblock
+    self.nstep=nstep
     self.averages=averages
 
     self.completed=False
@@ -38,7 +39,8 @@ class VMCWriter:
 
     outlines=[
         "method { VMC",
-        "  nblock %i"%(self.nblock)
+        "  nblock %i"%(self.nblock),
+        "  nstep %i"%(self.nstep)
       ]+['  '+line for line in self.averages.split('\n')]+[
         "}"
       ]
