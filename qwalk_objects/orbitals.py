@@ -98,7 +98,7 @@ class Orbitals:
       for element in self.basis[species]:
         numprim=element['coefs'].shape[0]
         outlines+=['    %s %d'%(element['angular'],numprim)]
-        outlines+=['    %d %.16f %.16f'%(idx,exp,coef)
+        outlines+=['    %d %.16f %.16f'%(idx+1,exp,coef)
             for idx,exp,coef in zip(range(numprim),element['exponents'],element['coefs'])
           ]
       outlines+=['  }','}']
@@ -117,8 +117,8 @@ class Orbitals:
       "{0}orbitals {{".format(('','c')[iscomplex]),
       "  magnify 1",
       "  nmo {0}".format(sum([e.shape[0] for e in self.eigvecs])),
-      "  orbfile {0}".format(orbfn),
-      self.export_qwalk_basis(),
+      "  orbfile {0}".format(orbfn)
+      ] + ["  "+line for line in self.export_qwalk_basis().split('\n')] + [
       "  centers { useglobal }",
       "}"
     ]

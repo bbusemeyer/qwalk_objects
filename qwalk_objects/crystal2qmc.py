@@ -25,6 +25,7 @@ periodic_table = ['H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne', 'Na',
 
 ###############################################################################
 # Convenince method
+# TODO this should use pack_objects to remove redundant code.
 def convert_crystal(
     base="qwalk",
     propoutfn="prop.in.o",
@@ -659,7 +660,10 @@ def write_orb(eigsys,basis,ions,kpt,outfn,maxmo_spin=-1):
   if maxmo_spin < 0:
     maxmo_spin=basis['nmo']
 
-  eigvecs=[normalize_eigvec(eigvec_lookup(kpt,eigsys,spin),basis) for spin in range(eigsys['nspin'])]
+  fbasis = format_basis(ions,basis)
+  atom_order=[periodic_table[n%200-1] for n in ions['atom_nums']]
+
+  eigvecs=[normalize_eigvec(eigvec_lookup(kpt,eigsys,spin),fbasis,atom_order) for spin in range(eigsys['nspin'])]
   atidxs = np.unique(basis['atom_shell'])-1
   nao_atom = np.zeros(atidxs.size,dtype=int)
   for shidx in range(len(basis['nao_shell'])):
