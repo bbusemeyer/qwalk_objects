@@ -87,7 +87,7 @@ class LinearReader:
           (len(self.output['energy_trace']),self.minsteps))
       return False
     else:
-      ediff=self.output['energy_trace'][-1]-self.output['energy_trace'][-2]
+      ediff=abs(self.output['energy_trace'][-1]-self.output['energy_trace'][-2])
       ediff_err=(self.output['energy_trace_err'][-1]**2 + self.output['energy_trace_err'][-2]**2)**0.5
       if ediff > self.sigtol*ediff_err:
         print(self.__class__.__name__,"Linear optimize incomplete: change in energy (%.5f) less than tolerance (%.2f*%.2f=%.5f)"%\
@@ -96,7 +96,7 @@ class LinearReader:
     return True
           
   #------------------------------------------------
-  def collect(self,outfile,errtol=None,minblocks=None):
+  def collect(self,outfile):
     ''' Collect results for each output file and resolve if the run needs to be resumed. 
 
     Args: 
